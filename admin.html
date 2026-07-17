@@ -187,7 +187,8 @@ async function loadWindows() {
     const viewBtn = mkBtn("VIEW SUBS", "ghost small", () => openSubs(w));
     actions.appendChild(viewBtn);
     if (state === "live") actions.appendChild(mkBtn("CLOSE NOW", "ghost small", () => closeNow(w)));
-    if (state === "past") actions.appendChild(mkBtn("WIPE FILES", "danger small", () => wipeFiles(w)));
+    if (state === "past" && !w.files_wiped) actions.appendChild(mkBtn("WIPE FILES", "danger small", () => wipeFiles(w)));
+    if (w.files_wiped) { const t = document.createElement("span"); t.className = "tag"; t.textContent = "ARCHIVED"; actions.appendChild(t); }
     list.appendChild(row);
   });
 }
@@ -215,14 +216,20 @@ async function closeNow(w) {
 }
 
 async function wipeFiles(w) {
-  if (!confirm('Delete ALL audio files for "' + w.title + '"? Submission info stays in the database, but the MP3s are gone for good. Do this after the stream, not before.')) return;
+  if (!confirm('Delete ALL audio files for "' + w.title + '"? Track names, notes, and picks stay as the archive, but the MP3s are gone for good. Do this after the stream, not before.')) return;
   const { data: files, error } = await sb.storage.from("renders").list(w.id, { limit: 1000 });
   if (error) { alert("Couldn't list files: " + error.message); return; }
-  if (!files || !files.length) { alert("No files stored for this window."); return; }
-  const paths = files.map(f => w.id + "/" + f.name);
-  const { error: delErr } = await sb.storage.from("renders").remove(paths);
-  if (delErr) { alert("Couldn't delete: " + delErr.message); return; }
-  alert("Deleted " + paths.length + " file(s). Storage freed up.");
+  if (files && files.length) {
+    const paths = files.map(f => w.id + "/" + f.name);
+    const { error: delErr } = await sb.storage.from("renders").remove(paths);
+    if (delErr) { alert("Couldn't delete: " + delErr.message); return; }
+  }
+  const { error: flagErr } = await sb.from("windows").update({ files_wiped: true }).eq("id", w.id);
+  if (flagErr) { alert("Files deleted, but couldn't archive the window: " + flagErr.message); }
+  alert("Wiped. Window is now archived — picks and titles stay, audio is gone.");
+  await loadWindows();
+  const updated = windows.find(x => x.id === w.id);
+  if (activeWinId === w.id && updated) openSubs(updated);
 }
 
 /* ---------- submissions ---------- */
@@ -237,7 +244,7 @@ async function openSubs(w) {
   list.innerHTML = "";
   if (error) { $("subsStatus").className = "status err"; $("subsStatus").textContent = "Couldn't load: " + error.message; return; }
   if (!data.length) { $("subsStatus").textContent = ""; list.innerHTML = '<div class="empty">Nothing submitted yet.</div>'; return; }
-  $("subsStatus").textContent = data.length + " submission(s) · " + data.filter(s => s.picked).length + " picked";
+  $("subsStatus").textContent = data.length + " submission(s) · " + data.filter(s => s.picked).length + " picked" + (w.files_wiped ? " · ARCHIVED — audio wiped, picks locked" : "");
   data.forEach(s => list.appendChild(renderSub(s, w)));
   $("subsPanel").scrollIntoView({ behavior: "smooth" });
 }
@@ -257,7 +264,8 @@ function renderSub(s, w) {
     '<div class="audioSlot"></div>';
   const actions = el.querySelector(".subactions");
 
-  actions.appendChild(mkBtn("▶ LOAD AUDIO", "ghost small", async (btn) => {
+  if (!w.files_wiped) {
+    actions.appendChild(mkBtn("▶ LOAD AUDIO", "ghost small", async (btn) => {
     btn.disabled = true; btn.textContent = "LOADING…";
     const { data, error } = await sb.storage.from("renders").createSignedUrl(s.audio_path, 3600);
     if (error) { btn.textContent = "AUDIO ERROR"; return; }
@@ -265,13 +273,14 @@ function renderSub(s, w) {
     audio.controls = true; audio.src = data.signedUrl;
     el.querySelector(".audioSlot").appendChild(audio);
     btn.remove();
-  }));
+    }));
 
-  actions.appendChild(mkBtn("⬇ DOWNLOAD MP3", "ghost small", async (btn) => {
+    actions.appendChild(mkBtn("⬇ DOWNLOAD MP3", "ghost small", async (btn) => {
     const { data, error } = await sb.storage.from("renders").createSignedUrl(s.audio_path, 3600, { download: true });
     if (error) { btn.textContent = "ERROR"; return; }
     window.open(data.signedUrl, "_blank");
-  }));
+    }));
+  }
 
   if (s.project_link) {
     const a = document.createElement("a");
@@ -281,11 +290,13 @@ function renderSub(s, w) {
     actions.appendChild(a);
   }
 
-  actions.appendChild(mkBtn(s.picked ? "UNPICK" : "★ PICK THIS", s.picked ? "ghost small" : "small", async () => {
+  if (!w.files_wiped) {
+    actions.appendChild(mkBtn(s.picked ? "UNPICK" : "★ PICK THIS", s.picked ? "ghost small" : "small", async () => {
     const { error } = await sb.from("submissions").update({ picked: !s.picked }).eq("id", s.id);
     if (error) { alert("Couldn't update pick: " + error.message); return; }
     openSubs(windows.find(x => x.id === activeWinId) || w);
-  }));
+    }));
+  }
 
   return el;
 }
