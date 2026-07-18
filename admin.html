@@ -56,6 +56,7 @@
 
   .sub{border:1px solid var(--line);border-radius:6px;background:var(--panel-2);padding:16px;margin-bottom:14px}
   .sub.picked{border-color:var(--amber);box-shadow:0 0 0 1px var(--amber) inset}
+  .sub.roulette{border-color:var(--teal);box-shadow:0 0 0 1px var(--teal) inset}
   .subhead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
   .subhead .track{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:16px}
   .subhead .by{color:var(--teal);font-size:12px}
@@ -118,7 +119,10 @@
     </div>
 
     <div class="panel hidden" id="subsPanel">
-      <h2 id="subsTitle">Submissions</h2>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+        <h2 id="subsTitle" style="margin-bottom:0">Submissions</h2>
+        <button class="btn small hidden" id="randomBtn">🎲 RANDOM PICK</button>
+      </div>
       <div class="status" id="subsStatus"></div>
       <div id="subsList"></div>
     </div>
@@ -134,7 +138,7 @@ const SUPABASE_KEY = "sb_publishable_Rba1RBrB7u0_79fUzEUYhw_Wm_Ev_42";
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const $ = id => document.getElementById(id);
-let session = null, windows = [], activeWinId = null;
+let session = null, windows = [], activeWinId = null, currentSubs = [];
 
 async function init() {
   const { data } = await sb.auth.getSession();
@@ -242,12 +246,53 @@ async function openSubs(w) {
     .eq("window_id", w.id).order("created_at", { ascending: true });
   const list = $("subsList");
   list.innerHTML = "";
-  if (error) { $("subsStatus").className = "status err"; $("subsStatus").textContent = "Couldn't load: " + error.message; return; }
-  if (!data.length) { $("subsStatus").textContent = ""; list.innerHTML = '<div class="empty">Nothing submitted yet.</div>'; return; }
+  currentSubs = data || [];
+  if (error) { $("subsStatus").className = "status err"; $("subsStatus").textContent = "Couldn't load: " + error.message; $("randomBtn").classList.add("hidden"); return; }
+  if (!data.length) { $("subsStatus").textContent = ""; $("randomBtn").classList.add("hidden"); list.innerHTML = '<div class="empty">Nothing submitted yet.</div>'; return; }
   $("subsStatus").textContent = data.length + " submission(s) · " + data.filter(s => s.picked).length + " picked" + (w.files_wiped ? " · ARCHIVED — audio wiped, picks locked" : "");
+  $("randomBtn").classList.toggle("hidden", !!w.files_wiped || !data.some(s => !s.picked));
   data.forEach(s => list.appendChild(renderSub(s, w)));
   $("subsPanel").scrollIntoView({ behavior: "smooth" });
 }
+
+/* ---------- random picker ---------- */
+let rouletteRunning = false;
+$("randomBtn").onclick = () => {
+  if (rouletteRunning) return;
+  const w = windows.find(x => x.id === activeWinId);
+  if (!w || w.files_wiped) return;
+  const candidates = currentSubs.map((s, i) => ({ s, i })).filter(o => !o.s.picked);
+  if (!candidates.length) return;
+
+  rouletteRunning = true;
+  $("randomBtn").disabled = true;
+  const cards = Array.from(document.querySelectorAll("#subsList .sub"));
+  const winner = candidates[Math.floor(Math.random() * candidates.length)];
+
+  let last = null, ticks = 0;
+  const totalTicks = 24; // ~2.4s of bouncing
+  const spin = setInterval(async () => {
+    if (last) last.classList.remove("roulette");
+    ticks++;
+    if (ticks < totalTicks) {
+      const rand = candidates[Math.floor(Math.random() * candidates.length)];
+      last = cards[rand.i];
+      if (last) last.classList.add("roulette");
+      return;
+    }
+    // land on the winner
+    clearInterval(spin);
+    last = cards[winner.i];
+    if (last) { last.classList.add("roulette"); last.scrollIntoView({ behavior: "smooth", block: "center" }); }
+    setTimeout(async () => {
+      const { error } = await sb.from("submissions").update({ picked: true }).eq("id", winner.s.id);
+      rouletteRunning = false;
+      $("randomBtn").disabled = false;
+      if (error) { alert("Couldn't save the pick: " + error.message); return; }
+      openSubs(w);
+    }, 700);
+  }, 100);
+};
 
 function renderSub(s, w) {
   const el = document.createElement("div");
