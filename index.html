@@ -137,6 +137,7 @@
       <div class="glyph">✔</div>
       <h2>You're in</h2>
       <p id="doneMsg">Your submission is locked in for this window. One entry per VIP — tune in to see if G-REX picks your project.</p>
+      <p style="margin-top:16px"><button class="btn ghost hidden" id="editBtn">EDIT SUBMISSION</button></p>
     </div>
 
     <!-- needs fresh twitch session -->
@@ -189,7 +190,7 @@ const MAX_MB = 15;
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const $ = id => document.getElementById(id);
-let session = null, currentWindow = null, countdownTimer = null;
+let session = null, currentWindow = null, countdownTimer = null, mySub = null, editMode = false;
 
 sb.auth.onAuthStateChange((_event, s) => {
   if (s && s.provider_token) sessionStorage.setItem("twitch_token", s.provider_token);
@@ -252,10 +253,12 @@ async function loadWindow() {
   }
 
   // already submitted?
-  const { data: mine } = await sb.from("submissions").select("id, track_name")
+  const { data: mine } = await sb.from("submissions").select("*")
     .eq("window_id", currentWindow.id).eq("user_id", session.user.id).limit(1);
   if (mine && mine[0]) {
-    $("doneMsg").textContent = '"' + mine[0].track_name + '" is locked in for this window. One entry per VIP — tune in to see if G-REX picks it.';
+    mySub = mine[0];
+    $("doneMsg").textContent = '"' + mySub.track_name + '" is locked in for this window. You can edit or re-render it until submissions close ' + fmtDate(currentWindow.closes_at) + '.';
+    $("editBtn").classList.remove("hidden");
     $("donePanel").classList.remove("hidden");
     return;
   }
@@ -263,8 +266,11 @@ async function loadWindow() {
   // fresh twitch token available?
   if (!twitchToken()) { $("refreshPanel").classList.remove("hidden"); return; }
 
+  editMode = false; mySub = null;
   $("winTitle").textContent = currentWindow.title || "Submit your project";
   $("winDeadline").textContent = "Submissions close " + fmtDate(currentWindow.closes_at) + ".";
+  $("submitBtn").textContent = "SUBMIT PROJECT";
+  $("submitBtn").disabled = false;
   $("formPanel").classList.remove("hidden");
 }
 
@@ -317,6 +323,25 @@ $("loginBtn").onclick = login;
 $("reloginBtn").onclick = async () => { await sb.auth.signOut(); sessionStorage.removeItem("twitch_token"); login(); };
 $("logoutBtn").onclick = async () => { await sb.auth.signOut(); sessionStorage.removeItem("twitch_token"); location.reload(); };
 
+$("editBtn").onclick = () => {
+  if (!mySub || !currentWindow) return;
+  if (!twitchToken()) { hideAll(); $("refreshPanel").classList.remove("hidden"); return; }
+  editMode = true;
+  hideAll();
+  $("winTitle").textContent = "Edit your submission";
+  $("winDeadline").textContent = "Changes overwrite your current entry. Editable until submissions close " + fmtDate(currentWindow.closes_at) + ".";
+  $("trackName").value = mySub.track_name || "";
+  $("note").value = mySub.note || "";
+  $("projectLink").value = mySub.project_link || "";
+  fileInput.value = "";
+  dz.classList.remove("hasfile");
+  $("dropText").textContent = "Keeping your current MP3 — click only if you want to replace it";
+  $("submitBtn").textContent = "UPDATE SUBMISSION";
+  $("submitBtn").disabled = false;
+  $("status").className = "status";
+  $("formPanel").classList.remove("hidden");
+};
+
 /* file picker */
 const dz = $("dropzone"), fileInput = $("audioFile");
 dz.onclick = () => fileInput.click();
@@ -340,10 +365,12 @@ $("submitBtn").onclick = async () => {
   const link = $("projectLink").value.trim();
 
   if (!name) return setStatus("err", "Give your track a name.");
-  if (!file) return setStatus("err", "Attach your MP3 render.");
-  const isMp3 = /\.mp3$/i.test(file.name) || file.type === "audio/mpeg";
-  if (!isMp3) return setStatus("err", "MP3 only — export from Ableton as MP3, 320 kbps.");
-  if (file.size > MAX_MB * 1048576) return setStatus("err", "That file is over " + MAX_MB + " MB. Export at 320 kbps or trim the render.");
+  if (!file && !editMode) return setStatus("err", "Attach your MP3 render.");
+  if (file) {
+    const isMp3 = /\.mp3$/i.test(file.name) || file.type === "audio/mpeg";
+    if (!isMp3) return setStatus("err", "MP3 only — export from Ableton as MP3, 320 kbps.");
+    if (file.size > MAX_MB * 1048576) return setStatus("err", "That file is over " + MAX_MB + " MB. Export at 320 kbps or trim the render.");
+  }
   if (link && !/^https?:\/\//i.test(link)) return setStatus("err", "Project link needs to be a full URL (starts with https://).");
   if (!twitchToken()) { hideAll(); $("refreshPanel").classList.remove("hidden"); return; }
 
@@ -352,10 +379,10 @@ $("submitBtn").onclick = async () => {
   fd.append("track_name", name);
   fd.append("note", $("note").value.trim());
   fd.append("project_link", link);
-  fd.append("audio", file);
+  if (file) fd.append("audio", file);
 
   $("submitBtn").disabled = true;
-  setStatus("busy", "Verifying your sub and uploading…");
+  setStatus("busy", editMode ? "Saving your changes…" : "Verifying your sub and uploading…");
 
   try {
     const res = await fetch(SUPABASE_URL + "/functions/v1/submit", {
@@ -371,8 +398,11 @@ $("submitBtn").onclick = async () => {
       return;
     }
     hideAll();
-    $("doneMsg").textContent = '"' + name + '" is locked in. One entry per VIP — tune in to see if G-REX picks it.';
-    $("donePanel").classList.remove("hidden");
+    $("status").className = "status";
+    fileInput.value = "";
+    dz.classList.remove("hasfile");
+    $("dropText").textContent = "Click to choose your .mp3 (or drag it here)";
+    await loadWindow();
   } catch (e) {
     setStatus("err", "Network error — check your connection and try again.");
     $("submitBtn").disabled = false;
