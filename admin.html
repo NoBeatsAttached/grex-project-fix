@@ -121,7 +121,10 @@
     <div class="panel hidden" id="subsPanel">
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">
         <h2 id="subsTitle" style="margin-bottom:0">Submissions</h2>
-        <button class="btn small hidden" id="randomBtn">🎲 RANDOM PICK</button>
+        <span class="hidden" id="randomControls" style="display:flex;align-items:center;gap:8px">
+          <select id="randomCount" style="background:var(--panel-2);border:1px solid var(--line);border-radius:4px;color:var(--text);font-family:inherit;font-size:13px;padding:8px 10px"></select>
+          <button class="btn small" id="randomBtn">🎲 RANDOM</button>
+        </span>
       </div>
       <div class="status" id="subsStatus"></div>
       <div id="subsList"></div>
@@ -247,51 +250,74 @@ async function openSubs(w) {
   const list = $("subsList");
   list.innerHTML = "";
   currentSubs = data || [];
-  if (error) { $("subsStatus").className = "status err"; $("subsStatus").textContent = "Couldn't load: " + error.message; $("randomBtn").classList.add("hidden"); return; }
-  if (!data.length) { $("subsStatus").textContent = ""; $("randomBtn").classList.add("hidden"); list.innerHTML = '<div class="empty">Nothing submitted yet.</div>'; return; }
+  if (error) { $("subsStatus").className = "status err"; $("subsStatus").textContent = "Couldn't load: " + error.message; $("randomControls").classList.add("hidden"); return; }
+  if (!data.length) { $("subsStatus").textContent = ""; $("randomControls").classList.add("hidden"); list.innerHTML = '<div class="empty">Nothing submitted yet.</div>'; return; }
   $("subsStatus").textContent = data.length + " submission(s) · " + data.filter(s => s.picked).length + " picked" + (w.files_wiped ? " · ARCHIVED — audio wiped, picks locked" : "");
-  $("randomBtn").classList.toggle("hidden", !!w.files_wiped || !data.some(s => !s.picked));
+  const unpicked = data.filter(s => !s.picked).length;
+  const showRandom = !w.files_wiped && unpicked > 0;
+  $("randomControls").classList.toggle("hidden", !showRandom);
+  if (showRandom) {
+    const sel = $("randomCount");
+    sel.innerHTML = "";
+    for (let i = 1; i <= unpicked; i++) {
+      const o = document.createElement("option");
+      o.value = i; o.textContent = "PICK " + i;
+      sel.appendChild(o);
+    }
+  }
   data.forEach(s => list.appendChild(renderSub(s, w)));
   $("subsPanel").scrollIntoView({ behavior: "smooth" });
 }
 
 /* ---------- random picker ---------- */
 let rouletteRunning = false;
-$("randomBtn").onclick = () => {
+$("randomBtn").onclick = async () => {
   if (rouletteRunning) return;
   const w = windows.find(x => x.id === activeWinId);
   if (!w || w.files_wiped) return;
-  const candidates = currentSubs.map((s, i) => ({ s, i })).filter(o => !o.s.picked);
+  let candidates = currentSubs.map((s, i) => ({ s, i })).filter(o => !o.s.picked);
   if (!candidates.length) return;
+  const count = Math.min(parseInt($("randomCount").value || "1", 10) || 1, candidates.length);
 
   rouletteRunning = true;
   $("randomBtn").disabled = true;
   const cards = Array.from(document.querySelectorAll("#subsList .sub"));
-  const winner = candidates[Math.floor(Math.random() * candidates.length)];
+  const winners = [];
 
-  let last = null, ticks = 0;
-  const totalTicks = 24; // ~2.4s of bouncing
-  const spin = setInterval(async () => {
-    if (last) last.classList.remove("roulette");
-    ticks++;
-    if (ticks < totalTicks) {
-      const rand = candidates[Math.floor(Math.random() * candidates.length)];
-      last = cards[rand.i];
-      if (last) last.classList.add("roulette");
-      return;
-    }
-    // land on the winner
-    clearInterval(spin);
-    last = cards[winner.i];
-    if (last) { last.classList.add("roulette"); last.scrollIntoView({ behavior: "smooth", block: "center" }); }
-    setTimeout(async () => {
-      const { error } = await sb.from("submissions").update({ picked: true }).eq("id", winner.s.id);
-      rouletteRunning = false;
-      $("randomBtn").disabled = false;
-      if (error) { alert("Couldn't save the pick: " + error.message); return; }
-      openSubs(w);
-    }, 700);
-  }, 100);
+  const spinOnce = () => new Promise(resolve => {
+    const winner = candidates[Math.floor(Math.random() * candidates.length)];
+    let last = null, ticks = 0;
+    const totalTicks = 20; // ~2s of bouncing per pick
+    const spin = setInterval(() => {
+      if (last) last.classList.remove("roulette");
+      ticks++;
+      if (ticks < totalTicks) {
+        const rand = candidates[Math.floor(Math.random() * candidates.length)];
+        last = cards[rand.i];
+        if (last) last.classList.add("roulette");
+        return;
+      }
+      // land on this spin's winner and lock it amber
+      clearInterval(spin);
+      const card = cards[winner.i];
+      if (card) {
+        card.classList.remove("roulette");
+        card.classList.add("picked");
+        card.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+      winners.push(winner.s.id);
+      candidates = candidates.filter(c => c.s.id !== winner.s.id);
+      setTimeout(resolve, 650);
+    }, 100);
+  });
+
+  for (let n = 0; n < count; n++) await spinOnce();
+
+  const { error } = await sb.from("submissions").update({ picked: true }).in("id", winners);
+  rouletteRunning = false;
+  $("randomBtn").disabled = false;
+  if (error) { alert("Couldn't save the picks: " + error.message); return; }
+  openSubs(w);
 };
 
 function renderSub(s, w) {
