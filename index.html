@@ -379,24 +379,51 @@ $("submitBtn").onclick = async () => {
   fd.append("track_name", name);
   fd.append("note", $("note").value.trim());
   fd.append("project_link", link);
-  if (file) fd.append("audio", file);
+  fd.append("has_file", file ? "1" : "0");
+  fd.append("action", "prepare");
 
   $("submitBtn").disabled = true;
-  setStatus("busy", editMode ? "Saving your changes…" : "Verifying your sub and uploading…");
 
-  try {
+  const callSubmit = async () => {
     const res = await fetch(SUPABASE_URL + "/functions/v1/submit", {
       method: "POST",
       headers: { "Authorization": "Bearer " + session.access_token, "apikey": SUPABASE_KEY },
       body: fd
     });
     const out = await res.json().catch(() => ({}));
+    return { res, out };
+  };
+
+  try {
+    setStatus("busy", "Verifying your sub…");
+    let { res, out } = await callSubmit();
     if (!res.ok) {
       if (res.status === 401 && out.code === "twitch_expired") { hideAll(); $("refreshPanel").classList.remove("hidden"); return; }
       setStatus("err", out.error || "Something broke on our end. Try again in a minute.");
       $("submitBtn").disabled = false;
       return;
     }
+
+    if (out.token) {
+      // MP3 goes straight to storage — built for big files, no middleman
+      setStatus("busy", "Uploading your MP3… slower connections can take a few minutes. Keep this tab open.");
+      const { error: upErr } = await sb.storage.from("renders")
+        .uploadToSignedUrl(out.path, out.token, file, { contentType: "audio/mpeg" });
+      if (upErr) {
+        setStatus("err", "Upload failed (" + upErr.message + "). Check your connection and hit submit again.");
+        $("submitBtn").disabled = false;
+        return;
+      }
+      setStatus("busy", "Locking it in…");
+      fd.set("action", "finalize");
+      ({ res, out } = await callSubmit());
+      if (!res.ok) {
+        setStatus("err", out.error || "Upload worked but the last step failed — hit submit again.");
+        $("submitBtn").disabled = false;
+        return;
+      }
+    }
+
     hideAll();
     $("status").className = "status";
     fileInput.value = "";
@@ -404,7 +431,7 @@ $("submitBtn").onclick = async () => {
     $("dropText").textContent = "Click to choose your .mp3 (or drag it here)";
     await loadWindow();
   } catch (e) {
-    setStatus("err", "Network error — check your connection and try again.");
+    setStatus("err", "Connection dropped mid-submit — check your internet and hit submit again. Nothing was lost.");
     $("submitBtn").disabled = false;
   }
 };
