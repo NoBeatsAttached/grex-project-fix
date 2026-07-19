@@ -193,8 +193,16 @@ async function loadWindows() {
 
     const viewBtn = mkBtn("VIEW SUBS", "ghost small", () => openSubs(w));
     actions.appendChild(viewBtn);
-    if (state === "live") actions.appendChild(mkBtn("CLOSE NOW", "ghost small", () => closeNow(w)));
-    if (state === "past" && !w.files_wiped) actions.appendChild(mkBtn("WIPE FILES", "danger small", () => wipeFiles(w)));
+    if (state === "live") {
+      actions.appendChild(mkBtn("+1 HR", "ghost small", () => extendWindow(w, 1)));
+      actions.appendChild(mkBtn("EDIT TIMES", "ghost small", () => editTimes(row, w)));
+      actions.appendChild(mkBtn("CLOSE NOW", "ghost small", () => closeNow(w)));
+    }
+    if (state === "upcoming") actions.appendChild(mkBtn("EDIT TIMES", "ghost small", () => editTimes(row, w)));
+    if (state === "past" && !w.files_wiped) {
+      actions.appendChild(mkBtn("REOPEN +1 HR", "ghost small", () => reopenWindow(w)));
+      actions.appendChild(mkBtn("WIPE FILES", "danger small", () => wipeFiles(w)));
+    }
     if (w.files_wiped) { const t = document.createElement("span"); t.className = "tag"; t.textContent = "ARCHIVED"; actions.appendChild(t); }
     list.appendChild(row);
   });
@@ -220,6 +228,53 @@ async function closeNow(w) {
   const { error } = await sb.from("windows").update({ closes_at: new Date().toISOString() }).eq("id", w.id);
   if (error) alert("Couldn't close it: " + error.message);
   loadWindows();
+}
+
+async function extendWindow(w, hours) {
+  // extend from the scheduled close, or from right now if it already passed
+  const base = Math.max(new Date(w.closes_at).getTime(), Date.now());
+  const newClose = new Date(base + hours * 3600000);
+  const { error } = await sb.from("windows").update({ closes_at: newClose.toISOString() }).eq("id", w.id);
+  if (error) { alert("Couldn't extend: " + error.message); return; }
+  loadWindows();
+}
+
+async function reopenWindow(w) {
+  if (!confirm('Reopen "' + w.title + '" for 1 more hour? The form starts accepting again immediately.')) return;
+  const { error } = await sb.from("windows").update({ closes_at: new Date(Date.now() + 3600000).toISOString() }).eq("id", w.id);
+  if (error) { alert("Couldn't reopen: " + error.message); return; }
+  loadWindows();
+}
+
+function toLocalInput(iso) {
+  const d = new Date(iso);
+  const pad = n => String(n).padStart(2, "0");
+  return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + "T" + pad(d.getHours()) + ":" + pad(d.getMinutes());
+}
+
+function editTimes(row, w) {
+  if (row.querySelector(".timeedit")) return; // already open on this row
+  const box = document.createElement("div");
+  box.className = "timeedit";
+  box.style.cssText = "flex-basis:100%;display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;padding-top:10px";
+  box.innerHTML =
+    '<div><label>Opens</label><input type="datetime-local" class="eo"></div>' +
+    '<div><label>Closes</label><input type="datetime-local" class="ec"></div>';
+  box.appendChild(mkBtn("SAVE", "small", async () => {
+    const o = box.querySelector(".eo").value, c = box.querySelector(".ec").value;
+    if (!o || !c) { alert("Both times are needed."); return; }
+    const opens = new Date(o), closes = new Date(c);
+    if (closes <= opens) { alert("Close time has to be after open time."); return; }
+    const { error } = await sb.from("windows").update({
+      opens_at: opens.toISOString(), closes_at: closes.toISOString()
+    }).eq("id", w.id);
+    if (error) { alert("Couldn't save: " + error.message); return; }
+    loadWindows();
+  }));
+  box.appendChild(mkBtn("CANCEL", "ghost small", () => box.remove()));
+  box.querySelector(".eo").value = toLocalInput(w.opens_at);
+  box.querySelector(".ec").value = toLocalInput(w.closes_at);
+  row.appendChild(box);
 }
 
 async function wipeFiles(w) {
