@@ -52,6 +52,17 @@
   /* count bump animation when a new submission lands */
   .count.bump{animation:bump .5s ease}
   @keyframes bump{0%{transform:scale(1)}30%{transform:scale(1.18);color:var(--amber)}100%{transform:scale(1);color:var(--teal)}}
+
+  /* closed state: slim brand + QR card, no dead count/timer */
+  #badge.closed .led{background:var(--dim);box-shadow:none;animation:none}
+  #badge.closed .state{color:var(--dim)}
+  #badge.closed .left .kicker,
+  #badge.closed .left .count,
+  #badge.closed .left .count-label,
+  #badge.closed .left .timer{display:none}
+  #badge.closed .left .closed-msg{display:block}
+  .left .closed-msg{display:none;font-size:11px;line-height:1.5;color:var(--dim)}
+  .left .closed-msg b{color:var(--text);font-family:'Space Grotesk',sans-serif;font-size:13px;display:block;margin-bottom:6px}
 </style>
 </head>
 <body>
@@ -60,7 +71,7 @@
     <div class="top">
       <div class="led"></div>
       <div class="brand">PROJECT FIX <span>// PR0CESS_LIVE</span></div>
-      <div class="state">OPEN</div>
+      <div class="state" id="state">OPEN</div>
     </div>
     <div class="body">
       <div class="left">
@@ -71,6 +82,7 @@
           <div class="clock" id="clock">--:--:--</div>
           <div class="tlabel">until close</div>
         </div>
+        <div class="closed-msg"><b>PROJECT FIX</b>Submissions are closed right now — scan to see when the next window opens.</div>
       </div>
       <div class="qr">
         <div class="frame"><canvas id="qrCanvas"></canvas></div>
@@ -111,12 +123,17 @@ async function poll() {
   const win = data && data[0] ? data[0] : null;
 
   if (!win) {
-    // no open window -> hide the badge entirely
-    $("badge").classList.remove("show");
+    // no open window -> slim closed card (QR stays visible), don't hide
+    $("badge").classList.add("show");
+    $("badge").classList.add("closed");
+    $("state").textContent = "CLOSED";
     currentWindow = null;
     clearInterval(countdownTimer);
     return;
   }
+
+  $("badge").classList.remove("closed");
+  $("state").textContent = "OPEN";
 
   // window changed (new one, or reopened) -> restart countdown
   if (!currentWindow || currentWindow.id !== win.id || currentWindow.closes_at !== win.closes_at) {
