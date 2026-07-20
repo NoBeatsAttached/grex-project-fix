@@ -106,11 +106,29 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const $ = id => document.getElementById(id);
 let countdownTimer = null, pollTimer = null, lastCount = 0, currentWindow = null;
 
-// Draw the QR once — it never changes
-try {
-  QRCode.toCanvas($("qrCanvas"), SITE_URL, { margin: 0, width: 140,
-    color: { dark: "#0c0e0f", light: "#ffffff" } });
-} catch (e) { /* qr lib failed to load; badge still works without it */ }
+// Draw the QR once — it never changes. Try the library first; if it didn't
+// load for any reason, fall back to an image-based QR that needs no script.
+function drawQR() {
+  const canvas = $("qrCanvas");
+  if (window.QRCode && typeof window.QRCode.toCanvas === "function") {
+    window.QRCode.toCanvas(canvas, SITE_URL, { margin: 0, width: 160,
+      color: { dark: "#0c0e0f", light: "#ffffff" } }, (err) => {
+        if (err) swapToImageQR();
+      });
+  } else {
+    swapToImageQR();
+  }
+}
+function swapToImageQR() {
+  const canvas = $("qrCanvas");
+  const img = document.createElement("img");
+  img.alt = "QR to submit page";
+  img.src = "https://api.qrserver.com/v1/create-qr-code/?size=160x160&margin=0&data=" + encodeURIComponent(SITE_URL);
+  canvas.replaceWith(img);
+}
+// give the CDN script a beat to finish, then draw
+if (document.readyState === "complete") setTimeout(drawQR, 300);
+else window.addEventListener("load", () => setTimeout(drawQR, 300));
 
 async function poll() {
   const now = new Date().toISOString();
