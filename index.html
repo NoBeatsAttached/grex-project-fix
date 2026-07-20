@@ -116,6 +116,7 @@
     <h2>Step 1 — Log in with Twitch</h2>
     <p class="sub">We use your Twitch login to confirm your sub to GREXBEATZ. That's it — no posting, no access to anything else.</p>
     <button class="btn" id="loginBtn">LOG IN WITH TWITCH</button>
+    <div class="status" id="loginStatus"></div>
   </div>
 
   <!-- STATE: logged in -->
@@ -168,7 +169,7 @@
 
       <label for="projectLink">Link to your full project folder <span style="text-transform:none;letter-spacing:0">(optional, but do it)</span></label>
       <input type="url" id="projectLink" maxlength="300" placeholder="Google Drive / Dropbox link to your zipped Ableton project">
-      <p class="hint">If you get picked, we need the actual project. In Ableton: File → Collect All and Save, zip the project folder, upload it to Drive/Dropbox, set sharing to "anyone with the link," paste it here. No link and you're picked = we DM you scrambling.</p>
+      <p class="hint">If you get picked, we need the actual project — prepped so it opens clean on G-REX's machine, no missing plugins, no CPU meltdown. Before zipping: <b>bounce every MIDI track and anything running a third-party VST down to audio</b> (right-click the track → Freeze, then Flatten — and keep a muted copy of the MIDI clip if you want G-REX to see the notes). Stock Ableton devices are fine as-is. Then File → Collect All and Save, zip the project folder, upload it to Drive/Dropbox, set sharing to "anyone with the link," paste it here. No link and you're picked = we DM you scrambling.</p>
 
       <div style="margin-top:26px">
         <button class="btn" id="submitBtn">SUBMIT PROJECT</button>
@@ -189,6 +190,15 @@ const MAX_MB = 15;
 /* ========================================== */
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// If Twitch login failed, the error comes back written into the URL — grab it
+// before anything clears it, so we can actually show the person what happened.
+const authError = (() => {
+  try {
+    const p = new URLSearchParams(location.hash.replace(/^#/, ""));
+    return p.get("error_description") || p.get("error") || "";
+  } catch (e) { return ""; }
+})();
 const $ = id => document.getElementById(id);
 let session = null, currentWindow = null, countdownTimer = null, mySub = null, editMode = false;
 
@@ -210,6 +220,14 @@ async function render() {
   if (!session) {
     $("loginPanel").classList.remove("hidden");
     $("appArea").classList.add("hidden");
+    if (authError) {
+      const el = $("loginStatus");
+      el.className = "status err";
+      el.textContent = "Twitch login failed: " + authError +
+        (/email/i.test(authError)
+          ? " — this usually means the email on your Twitch account isn't verified. Go to twitch.tv → Settings → Security and Privacy, verify your email, then try again."
+          : "");
+    }
     setTransport(null);
     loadWindowPublic(); // still show countdown to logged-out visitors
     return;
