@@ -133,6 +133,12 @@
       <button id="logoutBtn">log out</button>
     </div>
 
+    <div id="adminBar" class="hidden" style="display:flex;gap:14px;align-items:center;font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:var(--dim);border:1px solid var(--line);border-radius:4px;padding:9px 14px;margin-bottom:22px;background:var(--panel-2)">
+      <span style="color:var(--amber);font-weight:700">ADMIN</span>
+      <a href="admin.html">Control Room</a>
+      <a href="overlay.html" target="_blank" rel="noopener">Stream Overlay</a>
+    </div>
+
     <!-- window closed -->
     <div class="panel bigstate hidden" id="closedPanel">
       <div class="glyph">⏸</div>
@@ -185,9 +191,7 @@
     </div>
   </div>
 
-  <footer>PR0CESS_LIVE // twitch.tv/grexbeatz // not a sub? <a href="https://www.twitch.tv/subs/grexbeatz" target="_blank" rel="noopener">sub up here</a>
-    <span id="adminNav" class="hidden"> // <a href="admin.html">control room</a> // <a href="overlay.html" target="_blank" rel="noopener">overlay</a></span>
-  </footer>
+  <footer>PR0CESS_LIVE // twitch.tv/grexbeatz // not a sub? <a href="https://www.twitch.tv/subs/grexbeatz" target="_blank" rel="noopener">sub up here</a></footer>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -246,7 +250,7 @@ async function render() {
   const meta = session.user.user_metadata || {};
   $("whoami").textContent = (meta.nickname || meta.name || meta.full_name || "twitch user").toUpperCase();
   sb.rpc("is_admin").then(({ data: isAdmin }) => {
-    if (isAdmin) $("adminNav").classList.remove("hidden");
+    if (isAdmin) $("adminBar").classList.remove("hidden");
   });
   await loadWindow();
 }
