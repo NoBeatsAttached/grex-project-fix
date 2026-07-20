@@ -111,6 +111,13 @@
   <h1>Send G-REX your stuck project. <em>Watch him fix it live.</em></h1>
   <p class="lede">Upload an MP3 render of the track you're stuck on. G-REX listens through every submission and picks the project(s) he'll open up and doctor on stream. Active subs (VIPs) only.</p>
 
+  <div class="panel" style="border-left:3px solid var(--amber)">
+    <h2>Read first — prep your project</h2>
+    <p class="sub" style="margin-bottom:10px">If you get picked, we need the actual project — prepped so it opens clean on G-REX's machine, no missing plugins, no CPU meltdown.</p>
+    <p class="sub" style="margin-bottom:10px"><b style="color:var(--text)">Bounce every MIDI track and anything running a third-party VST down to audio</b> — right-click the track → Freeze, then Flatten. Keep a muted copy of the MIDI clip if you want G-REX to see the notes. Stock Ableton devices are fine as-is.</p>
+    <p class="sub" style="margin-bottom:0">Then File → Collect All and Save, zip the project folder, upload it to Drive/Dropbox, set sharing to "anyone with the link," and paste the link in the form below. No link and you're picked = we DM you scrambling.</p>
+  </div>
+
   <!-- STATE: logged out -->
   <div class="panel" id="loginPanel">
     <h2>Step 1 — Log in with Twitch</h2>
@@ -169,7 +176,7 @@
 
       <label for="projectLink">Link to your full project folder <span style="text-transform:none;letter-spacing:0">(optional, but do it)</span></label>
       <input type="url" id="projectLink" maxlength="300" placeholder="Google Drive / Dropbox link to your zipped Ableton project">
-      <p class="hint">If you get picked, we need the actual project — prepped so it opens clean on G-REX's machine, no missing plugins, no CPU meltdown. Before zipping: <b>bounce every MIDI track and anything running a third-party VST down to audio</b> (right-click the track → Freeze, then Flatten — and keep a muted copy of the MIDI clip if you want G-REX to see the notes). Stock Ableton devices are fine as-is. Then File → Collect All and Save, zip the project folder, upload it to Drive/Dropbox, set sharing to "anyone with the link," paste it here. No link and you're picked = we DM you scrambling.</p>
+      <p class="hint">Prepped per the rules at the top of the page: MIDI + third-party VSTs bounced, Collect All and Save, zipped, uploaded to Drive/Dropbox with sharing set to "anyone with the link." No link and you're picked = we DM you scrambling.</p>
 
       <div style="margin-top:26px">
         <button class="btn" id="submitBtn">SUBMIT PROJECT</button>
