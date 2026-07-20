@@ -418,6 +418,7 @@ function renderSub(s, w) {
 
   if (!w.files_wiped) {
     actions.appendChild(mkBtn(s.picked ? "UNPICK" : "★ PICK THIS", s.picked ? "ghost small" : "small", async () => {
+    if (rouletteRunning) return; // don't let hand-picks fight the roulette mid-spin
     const { error } = await sb.from("submissions").update({ picked: !s.picked }).eq("id", s.id);
     if (error) { alert("Couldn't update pick: " + error.message); return; }
     openSubs(windows.find(x => x.id === activeWinId) || w);
