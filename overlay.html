@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PROJECT FIX // OVERLAY</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --panel:#141819; --panel-2:#1a1f21; --line:#2b3336;
+    --text:#e9e7e1; --dim:#8b948f; --amber:#ffb03a; --teal:#3fd1c4; --red:#ff5f56;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  /* transparent so OBS shows only the badge */
+  html,body{background:transparent;font-family:'JetBrains Mono',monospace;overflow:hidden}
+
+  /* the badge sits in a corner; OBS positions the whole source, this just pads it off the edge */
+  #stage{position:fixed;top:28px;right:28px}
+  #badge{
+    width:300px;background:linear-gradient(180deg,#161b1c,#0f1213);
+    border:1px solid var(--line);border-radius:12px;
+    box-shadow:0 8px 30px rgba(0,0,0,.5);
+    overflow:hidden;opacity:0;transform:translateY(-10px);
+    transition:opacity .4s ease, transform .4s ease;
+  }
+  #badge.show{opacity:1;transform:translateY(0)}
+
+  .top{display:flex;align-items:center;gap:9px;padding:12px 14px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#12171800,#0000)}
+  .led{width:9px;height:9px;border-radius:50%;background:var(--amber);box-shadow:0 0 9px var(--amber);flex:none;animation:pulse 1.6s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+  .brand{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:13px;letter-spacing:.05em;color:var(--text)}
+  .brand span{color:var(--dim);font-weight:500}
+  .state{margin-left:auto;font-size:10px;letter-spacing:.18em;color:var(--amber);font-weight:700}
+
+  .body{display:flex;gap:14px;padding:14px}
+  .left{flex:1;min-width:0}
+  .kicker{font-size:9px;letter-spacing:.22em;color:var(--dim);text-transform:uppercase;margin-bottom:8px}
+  .count{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:34px;line-height:1;color:var(--teal)}
+  .count-label{font-size:10px;letter-spacing:.14em;color:var(--dim);text-transform:uppercase;margin-top:3px}
+  .timer{margin-top:13px}
+  .timer .clock{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:19px;color:var(--amber);letter-spacing:.04em}
+  .timer .tlabel{font-size:9px;letter-spacing:.16em;color:var(--dim);text-transform:uppercase;margin-top:2px}
+
+  .qr{flex:none;width:82px}
+  .qr .frame{width:82px;height:82px;background:#fff;border-radius:8px;padding:6px;display:flex;align-items:center;justify-content:center}
+  .qr canvas,.qr img{width:100%;height:100%;display:block}
+  .qr .scan{font-size:8px;letter-spacing:.12em;color:var(--dim);text-align:center;text-transform:uppercase;margin-top:5px;line-height:1.3}
+  .qr .scan b{color:var(--teal);font-weight:500}
+
+  /* count bump animation when a new submission lands */
+  .count.bump{animation:bump .5s ease}
+  @keyframes bump{0%{transform:scale(1)}30%{transform:scale(1.18);color:var(--amber)}100%{transform:scale(1);color:var(--teal)}}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="badge">
+    <div class="top">
+      <div class="led"></div>
+      <div class="brand">PROJECT FIX <span>// PR0CESS_LIVE</span></div>
+      <div class="state">OPEN</div>
+    </div>
+    <div class="body">
+      <div class="left">
+        <div class="kicker">Submissions open</div>
+        <div class="count" id="count">0</div>
+        <div class="count-label">tracks in</div>
+        <div class="timer">
+          <div class="clock" id="clock">--:--:--</div>
+          <div class="tlabel">until close</div>
+        </div>
+      </div>
+      <div class="qr">
+        <div class="frame"><canvas id="qrCanvas"></canvas></div>
+        <div class="scan">scan to<br><b>submit</b></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script>
+/* ================= CONFIG ================= */
+const SUPABASE_URL = "https://cdkzbbrakewvhmejzryj.supabase.co";
+const SUPABASE_KEY = "sb_publishable_Rba1RBrB7u0_79fUzEUYhw_Wm_Ev_42";
+const SITE_URL = "https://nobeatsattached.github.io/grex-project-fix/";
+const POLL_MS = 8000; // how often to refresh count + window (8s is gentle on the free tier)
+/* ========================================== */
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const $ = id => document.getElementById(id);
+let countdownTimer = null, pollTimer = null, lastCount = 0, currentWindow = null;
+
+// Draw the QR once — it never changes
+try {
+  QRCode.toCanvas($("qrCanvas"), SITE_URL, { margin: 0, width: 140,
+    color: { dark: "#0c0e0f", light: "#ffffff" } });
+} catch (e) { /* qr lib failed to load; badge still works without it */ }
+
+async function poll() {
+  const now = new Date().toISOString();
+  const { data, error } = await sb.from("windows").select("*")
+    .lte("opens_at", now).gte("closes_at", now)
+    .order("closes_at", { ascending: true }).limit(1);
+
+  if (error) return; // keep showing last known state on a hiccup
+
+  const win = data && data[0] ? data[0] : null;
+
+  if (!win) {
+    // no open window -> hide the badge entirely
+    $("badge").classList.remove("show");
+    currentWindow = null;
+    clearInterval(countdownTimer);
+    return;
+  }
+
+  // window changed (new one, or reopened) -> restart countdown
+  if (!currentWindow || currentWindow.id !== win.id || currentWindow.closes_at !== win.closes_at) {
+    currentWindow = win;
+    startCountdown(win);
+  }
+  $("badge").classList.add("show");
+
+  // live submission count
+  const { count } = await sb.from("submissions")
+    .select("id", { count: "exact", head: true })
+    .eq("window_id", win.id);
+  if (typeof count === "number") setCount(count);
+}
+
+function setCount(n) {
+  const el = $("count");
+  el.textContent = n;
+  if (n > lastCount) { // bump animation when a new one lands
+    el.classList.remove("bump"); void el.offsetWidth; el.classList.add("bump");
+  }
+  lastCount = n;
+}
+
+function startCountdown(win) {
+  clearInterval(countdownTimer);
+  const tick = () => {
+    const ms = new Date(win.closes_at) - new Date();
+    if (ms <= 0) { $("clock").textContent = "00:00:00"; clearInterval(countdownTimer); poll(); return; }
+    const totalH = Math.floor(ms / 3600000);
+    const m = Math.floor(ms / 60000) % 60, s = Math.floor(ms / 1000) % 60;
+    const pad = n => String(n).padStart(2, "0");
+    $("clock").textContent = pad(totalH) + ":" + pad(m) + ":" + pad(s);
+  };
+  tick();
+  countdownTimer = setInterval(tick, 1000);
+}
+
+poll();
+pollTimer = setInterval(poll, POLL_MS);
+</script>
+</body>
+</html>
