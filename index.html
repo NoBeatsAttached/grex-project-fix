@@ -95,7 +95,11 @@
   .userline button{background:none;border:none;color:var(--dim);font-family:inherit;font-size:12px;cursor:pointer;text-decoration:underline;padding:0}
   .userline button:hover{color:var(--text)}
   .hidden{display:none!important}
-  footer{margin-top:60px;font-size:11px;color:#4d5652;letter-spacing:.12em}
+  footer{margin-top:60px;text-align:center}
+  .footmark{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:12px;letter-spacing:.22em;color:#4d5652}
+  .subcallout{margin-top:18px;padding-top:16px;border-top:1px solid var(--line);font-size:13px;color:var(--dim)}
+  .subcallout a{color:var(--amber);font-weight:700;text-decoration:none;white-space:nowrap}
+  .subcallout a:hover{text-decoration:underline}
 </style>
 </head>
 <body>
@@ -122,8 +126,10 @@
   <div class="panel" id="loginPanel">
     <h2>Step 1 — Log in with Twitch</h2>
     <p class="sub">We use your Twitch login to confirm your sub to GREXBEATZ. That's it — no posting, no access to anything else.</p>
+    <p class="sub" style="margin-bottom:18px;color:var(--amber)">Heads up: your Twitch account needs a <b>verified email</b> to log in. If login fails, that's usually why — verify it at twitch.tv → Settings → Security and Privacy, then come back.</p>
     <button class="btn" id="loginBtn">LOG IN WITH TWITCH</button>
     <div class="status" id="loginStatus"></div>
+    <div class="subcallout">Not a sub yet? PROJECT FIX is VIP-only. <a href="https://www.twitch.tv/subs/grexbeatz" target="_blank" rel="noopener">Sub to GREXBEATZ →</a></div>
   </div>
 
   <!-- STATE: logged in -->
@@ -191,7 +197,7 @@
     </div>
   </div>
 
-  <footer>PR0CESS_LIVE // twitch.tv/grexbeatz // not a sub? <a href="https://www.twitch.tv/subs/grexbeatz" target="_blank" rel="noopener">sub up here</a></footer>
+  <footer><span class="footmark">PR0CESS_LIVE</span></footer>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
