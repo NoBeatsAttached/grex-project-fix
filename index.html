@@ -282,7 +282,7 @@ async function loadWindow() {
     .eq("window_id", currentWindow.id).eq("user_id", session.user.id).limit(1);
   if (mine && mine[0]) {
     mySub = mine[0];
-    $("doneMsg").textContent = '"' + mySub.track_name + '" is locked in for this window. You can edit or re-render it until submissions close ' + fmtDate(currentWindow.closes_at) + '.';
+    $("doneMsg").textContent = '"' + mySub.track_name + '" is locked in for this window. You can edit or re-render it until submissions close ' + fmtDate(currentWindow.closes_at) + '.' + (mySub.project_link ? '' : ' Heads up: no project folder link yet — add one when you edit so you\'re ready if you get picked.');
     $("editBtn").classList.remove("hidden");
     $("donePanel").classList.remove("hidden");
     return;
