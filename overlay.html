@@ -39,25 +39,25 @@
       repeating-linear-gradient(45deg,#00000000 0 6px,#ffffff08 6px 12px),
       linear-gradient(180deg,#1a1f20,#141819);
   }
-  .led{width:11px;height:11px;background:var(--amber);box-shadow:0 0 10px var(--amber);flex:none;animation:pulse 1.6s ease-in-out infinite}
+  .led{width:13px;height:13px;background:var(--amber);box-shadow:0 0 10px var(--amber);flex:none;animation:pulse 1.6s ease-in-out infinite}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-  .brand{font-family:var(--hud);font-weight:400;font-size:17px;letter-spacing:.12em;color:var(--text);text-transform:uppercase}
+  .brand{font-family:var(--hud);font-weight:400;font-size:22px;letter-spacing:.12em;color:var(--text);text-transform:uppercase}
   .brand span{color:var(--dim)}
-  .state{margin-left:auto;font-size:14px;letter-spacing:.24em;color:var(--amber);text-transform:uppercase}
+  .state{margin-left:auto;font-size:18px;letter-spacing:.24em;color:var(--amber);text-transform:uppercase}
 
-  .body{display:flex;align-items:center;gap:20px;padding:12px 16px}
+  .body{display:flex;align-items:center;gap:24px;padding:16px 20px}
   .stat{display:flex;flex-direction:column;line-height:1}
-  .kicker{font-size:11px;letter-spacing:.22em;color:var(--dim);text-transform:uppercase;margin-bottom:6px}
-  .count{font-family:var(--hud);font-size:38px;color:var(--teal);letter-spacing:.02em}
-  .count-label{font-size:11px;letter-spacing:.16em;color:var(--dim);text-transform:uppercase;margin-top:4px}
+  .kicker{font-size:14px;letter-spacing:.18em;color:var(--dim);text-transform:uppercase;margin-bottom:8px}
+  .count{font-family:var(--hud);font-size:52px;color:var(--teal);letter-spacing:.02em}
+  .count-label{font-size:14px;letter-spacing:.12em;color:var(--dim);text-transform:uppercase;margin-top:6px}
   .divider{width:2px;align-self:stretch;background:var(--line);margin:2px 0}
-  .clock{font-family:var(--hud);font-size:30px;color:var(--amber);letter-spacing:.06em}
-  .tlabel{font-size:11px;letter-spacing:.18em;color:var(--dim);text-transform:uppercase;margin-top:4px}
+  .clock{font-family:var(--hud);font-size:42px;color:var(--amber);letter-spacing:.06em}
+  .tlabel{font-size:14px;letter-spacing:.14em;color:var(--dim);text-transform:uppercase;margin-top:6px}
 
-  .qr{margin-left:auto;display:flex;align-items:center;gap:10px}
-  .qr .frame{width:74px;height:74px;background:#fff;padding:5px;display:flex;align-items:center;justify-content:center}
+  .qr{margin-left:auto;display:flex;align-items:center;gap:14px}
+  .qr .frame{width:92px;height:92px;background:#fff;padding:6px;display:flex;align-items:center;justify-content:center}
   .qr canvas,.qr img,.qr svg{width:100%;height:100%;display:block}
-  .qr .scan{font-size:11px;letter-spacing:.16em;color:var(--dim);text-transform:uppercase;line-height:1.4;text-align:right}
+  .qr .scan{font-size:15px;letter-spacing:.14em;color:var(--dim);text-transform:uppercase;line-height:1.4;text-align:right}
   .qr .scan b{color:var(--teal);font-weight:400;display:block}
 
   .count.bump{animation:bump .5s ease}
@@ -70,8 +70,8 @@
   #badge.closed .divider{display:none}
   #badge.closed .closed-msg{display:flex}
   .closed-msg{display:none;flex-direction:column;line-height:1.4}
-  .closed-msg .cm-title{font-size:15px;letter-spacing:.1em;color:var(--text);text-transform:uppercase;margin-bottom:5px}
-  .closed-msg .cm-body{font-size:12px;color:var(--dim);letter-spacing:.04em}
+  .closed-msg .cm-title{font-size:22px;letter-spacing:.1em;color:var(--text);text-transform:uppercase;margin-bottom:7px}
+  .closed-msg .cm-body{font-size:17px;color:var(--dim);letter-spacing:.03em;line-height:1.5}
   .closed-msg .cm-body b{color:var(--amber);font-weight:400}
 </style>
 </head>
@@ -123,6 +123,14 @@ let countdownTimer = null, pollTimer = null, lastCount = 0, currentWindow = null
 // QR is now an inline SVG in the markup — no library, no external requests, nothing to block.
 
 async function poll() {
+  // remote on/off flag from the Control Room
+  const { data: setting } = await sb.from("app_settings").select("overlay_on").eq("id", 1).maybeSingle();
+  if (setting && setting.overlay_on === false) {
+    $("badge").classList.remove("show"); // hidden until switched on
+    clearInterval(countdownTimer);
+    return;
+  }
+
   const now = new Date().toISOString();
   const { data, error } = await sb.from("windows").select("*")
     .lte("opens_at", now).gte("closes_at", now)
@@ -162,11 +170,10 @@ async function poll() {
   }
   $("badge").classList.add("show");
 
-  // live submission count
-  const { count } = await sb.from("submissions")
-    .select("id", { count: "exact", head: true })
-    .eq("window_id", win.id);
-  if (typeof count === "number") setCount(count);
+  // live submission count — via a function, since the overlay is anonymous
+  // and RLS would otherwise hide the rows and return 0.
+  const { data: cnt } = await sb.rpc("window_submission_count", { win: win.id });
+  if (typeof cnt === "number") setCount(cnt);
 }
 
 function setCount(n) {
