@@ -100,7 +100,15 @@
   <!-- admin app -->
   <div id="app" class="hidden">
     <h1>Control Room</h1>
-    <p class="lede">Open windows, listen through submissions, mark G-REX's picks, wipe files after the stream. <a href="index.html">submit page</a> · <a href="overlay.html" target="_blank" rel="noopener">stream overlay</a></p>
+    <p class="lede">Open windows, listen through submissions, mark G-REX's picks, wipe files after the stream. <a href="index.html">submit page</a> · <a href="overlay.html" target="_blank" rel="noopener">stream overlay</a> · <a href="qr.html" target="_blank" rel="noopener">qr overlay</a></p>
+
+    <div class="panel" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <div>
+        <h2 style="margin-bottom:4px">Stream overlay</h2>
+        <p class="sub" style="margin-bottom:0" id="overlayHint">Show or hide the on-stream badge. Takes a few seconds to update in OBS.</p>
+      </div>
+      <button class="btn" id="overlayToggle" style="margin-left:auto" disabled>…</button>
+    </div>
 
     <div class="panel">
       <h2>New submission window</h2>
@@ -161,6 +169,29 @@ async function init() {
   }
   $("app").classList.remove("hidden");
   loadWindows();
+  loadOverlayToggle();
+}
+
+async function loadOverlayToggle() {
+  const { data } = await sb.from("app_settings").select("overlay_on").eq("id", 1).maybeSingle();
+  paintToggle(data ? data.overlay_on : false);
+}
+
+function paintToggle(on) {
+  const btn = $("overlayToggle");
+  btn.disabled = false;
+  btn.dataset.on = on ? "1" : "0";
+  btn.textContent = on ? "OVERLAY: ON" : "OVERLAY: OFF";
+  btn.className = "btn" + (on ? "" : " ghost");
+}
+
+$("overlayToggle").onclick = async () => {
+  const btn = $("overlayToggle");
+  const next = btn.dataset.on !== "1"; // flip
+  btn.disabled = true;
+  const { error } = await sb.from("app_settings").update({ overlay_on: next }).eq("id", 1);
+  if (error) { alert("Couldn't switch the overlay: " + error.message); btn.disabled = false; return; }
+  paintToggle(next);
 }
 
 $("loginBtn").onclick = () => sb.auth.signInWithOAuth({
