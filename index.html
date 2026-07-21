@@ -95,6 +95,10 @@
   .userline button{background:none;border:none;color:var(--dim);font-family:inherit;font-size:12px;cursor:pointer;text-decoration:underline;padding:0}
   .userline button:hover{color:var(--text)}
   .hidden{display:none!important}
+  ol.prep{margin:0;padding-left:22px;color:var(--dim);font-size:13px;line-height:1.6}
+  ol.prep li{margin-bottom:12px;padding-left:4px}
+  ol.prep li:last-child{margin-bottom:0}
+  ol.prep b{color:var(--text)}
   footer{margin-top:60px;text-align:center}
   .footmark{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:12px;letter-spacing:.22em;color:#4d5652}
   .subcallout{margin-top:18px;padding-top:16px;border-top:1px solid var(--line);font-size:13px;color:var(--dim)}
@@ -117,9 +121,17 @@
 
   <div class="panel" style="border-left:3px solid var(--amber)">
     <h2>Read first — prep your project</h2>
-    <p class="sub" style="margin-bottom:10px">If you get picked, we need the actual project — prepped so it opens clean on G-REX's machine, no missing plugins, no CPU meltdown.</p>
-    <p class="sub" style="margin-bottom:10px"><b style="color:var(--text)">Bounce every MIDI track and anything running a third-party VST down to audio</b> — right-click the track → Freeze, then Flatten. Keep a muted copy of the MIDI clip if you want G-REX to see the notes. Stock Ableton devices are fine as-is.</p>
-    <p class="sub" style="margin-bottom:0">Then File → Collect All and Save, zip the project folder, upload it to Drive/Dropbox, set sharing to "anyone with the link," and paste the link in the form below. No link, no problem — we just move on to the next winner.</p>
+    <p class="sub" style="margin-bottom:16px">If you get picked, we need your actual Ableton project — prepped so it opens clean on G-REX's machine. If it's not prepped, it won't open right and we move to the next winner. Here's the whole checklist:</p>
+
+    <ol class="prep">
+      <li><b>Bounce your MIDI and any non-Ableton plugins to audio.</b> G-REX doesn't have your VSTs (Serum, Vital, Kontakt, etc.), so those tracks need to become audio first. Two ways, whichever you know: <b>(a) Freeze &amp; Flatten</b> — right-click the track name → Freeze Track, then right-click again → Flatten. Or <b>(b) bounce/export the track to audio</b> and drag it back in — either one turns the VST's sound into a plain audio clip anyone can open. Do this for every track running a third-party plugin or instrument. Want the notes visible too? Duplicate the track and mute the MIDI copy before you bounce the other one.</li>
+      <li><b>Leave stock Ableton devices alone.</b> Anything built into Ableton (Operator, Wavetable, stock effects) opens fine on his end — only third-party stuff needs bouncing.</li>
+      <li><b>Collect all your samples into the project — this is the step people miss.</b> Your one-shots and samples live elsewhere on your computer, so the project opens with "samples missing" on his machine unless you pull them in. In Ableton: <b>File → Collect All and Save</b> → check all boxes → OK. This copies every sample into the project folder.</li>
+      <li><b>Zip the project folder.</b> Find the folder that now contains your <code style="background:var(--panel-2);padding:1px 5px;border-radius:3px">.als</code> file plus the Samples folder. Right-click it → compress/zip the whole folder (not just the .als).</li>
+      <li><b>Upload &amp; share.</b> Drop the zip on Google Drive or Dropbox, set sharing to <b>"anyone with the link,"</b> and paste that link in the form below.</li>
+    </ol>
+
+    <p class="sub" style="margin:16px 0 0"><b style="color:var(--amber)">Stuck on the Freeze/Flatten part?</b> Ask in Discord and we'll walk you through it.</p>
   </div>
 
   <!-- STATE: logged out -->
